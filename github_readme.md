@@ -183,14 +183,12 @@ Distributed under the MIT License. See `LICENSE` for more information.
 
 **Audysti Safrina Mendrofa**
 - Program Studi: Bisnis Digital
-- Universitas: [Nama Universitas]
-- Email: audysti@example.com
-- LinkedIn: [linkedin.com/in/audysti](https://linkedin.com/in/audysti)
+- Universitas: Universitas Mahkota Tricom Unggul
+- Email: audyysafrinamendrofa@gmail.com
 
 ## 🙏 Acknowledgments
 
 - Proyek PBL - Mata Kuliah Wawasan dan Aplikasi Teknologi
-- Dosen Pembimbing: [Nama Dosen]
 - UMKM Partner: Dapur Sari, Medan
 - Icons: Lucide Icons
 - Framework: Tailwind CSS
