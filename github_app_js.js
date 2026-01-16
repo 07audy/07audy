@@ -1,0 +1,377 @@
+// JajanKu - Main Application Logic
+
+// State Management
+let state = {
+    products: [],
+    cart: [],
+    showCart: false,
+    showOrderForm: false,
+    showToast: false,
+    toastMessage: ''
+};
+
+// Initialize Application
+const initApp = () => {
+    state.products = CONFIG.PRODUCTS;
+    render();
+};
+
+// Helper Functions
+const formatPrice = (price) => {
+    return new Intl.NumberFormat('id-ID', {
+        style: 'currency',
+        currency: 'IDR',
+        minimumFractionDigits: 0
+    }).format(price);
+};
+
+const getTotalItems = () => state.cart.reduce((sum, item) => sum + item.quantity, 0);
+const getTotalPrice = () => state.cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+
+const showToast = (message) => {
+    state.toastMessage = message;
+    state.showToast = true;
+    render();
+    setTimeout(() => {
+        state.showToast = false;
+        render();
+    }, 3000);
+};
+
+// Cart Functions
+const addToCartById = (id) => {
+    const product = state.products.find(p => p.id === id);
+    if (!product) return;
+    
+    const existing = state.cart.find(item => item.id === product.id);
+    if (existing) {
+        existing.quantity++;
+    } else {
+        state.cart.push({ ...product, quantity: 1 });
+    }
+    showToast(product.name + ' ditambahkan ke keranjang!');
+};
+
+const updateQuantity = (id, change) => {
+    const item = state.cart.find(i => i.id === id);
+    if (item) {
+        item.quantity += change;
+        if (item.quantity <= 0) {
+            state.cart = state.cart.filter(i => i.id !== id);
+        }
+        render();
+    }
+};
+
+const removeFromCart = (id) => {
+    state.cart = state.cart.filter(item => item.id !== id);
+    showToast('Produk dihapus dari keranjang');
+};
+
+// WhatsApp Integration
+const kirimKeWhatsApp = () => {
+    const nama = document.getElementById('nama').value.trim();
+    const hp = document.getElementById('hp').value.trim();
+    const alamat = document.getElementById('alamat').value.trim();
+    const tanggal = document.getElementById('tanggal').value;
+    const catatan = document.getElementById('catatan').value.trim();
+
+    if (!nama || !hp || !alamat || !tanggal) {
+        alert('⚠️ Mohon lengkapi semua data yang wajib diisi!\n\n- Nama Lengkap\n- No. Handphone\n- Alamat\n- Tanggal Ambil/Kirim');
+        return;
+    }
+
+    if (state.cart.length === 0) {
+        alert('⚠️ Keranjang masih kosong!');
+        return;
+    }
+
+    let pesanan = '';
+    state.cart.forEach(item => {
+        pesanan += item.name + ' (' + item.quantity + ' box) = ' + formatPrice(item.price * item.quantity) + '\n';
+    });
+
+    const pesan = 
+        '*PESANAN BARU - JAJANKU* 🍡\n' +
+        '━━━━━━━━━━━━━━━━━━━\n\n' +
+        '👤 *Nama:* ' + nama + '\n' +
+        '📱 *No. HP:* ' + hp + '\n' +
+        '📍 *Alamat:* ' + alamat + '\n' +
+        '📅 *Tanggal Ambil:* ' + tanggal + '\n' +
+        '📝 *Catatan:* ' + (catatan || '-') + '\n\n' +
+        '━━━━━━━━━━━━━━━━━━━\n' +
+        '🛒 *DETAIL PESANAN:*\n' +
+        '━━━━━━━━━━━━━━━━━━━\n\n' +
+        pesanan + '\n' +
+        '━━━━━━━━━━━━━━━━━━━\n' +
+        '💰 *TOTAL: ' + formatPrice(getTotalPrice()) + '*\n' +
+        '━━━━━━━━━━━━━━━━━━━\n\n' +
+        '_Terima kasih sudah memesan di ' + CONFIG.SHOP_INFO.name + '!_ 🙏';
+
+    const pesanEncoded = encodeURIComponent(pesan);
+    const urlWA = 'https://api.whatsapp.com/send?phone=' + CONFIG.SELLER_WHATSAPP + '&text=' + pesanEncoded;
+
+    console.log('Mengirim ke WhatsApp:', urlWA);
+    window.location.href = urlWA;
+
+    setTimeout(() => {
+        state.cart = [];
+        state.showOrderForm = false;
+        render();
+    }, 2000);
+};
+
+// Render Function
+const render = () => {
+    const app = document.getElementById('app');
+    const icons = CONFIG.ICONS;
+    const shop = CONFIG.SHOP_INFO;
+    
+    app.innerHTML = `
+        ${state.showToast ? `
+            <div class="fixed top-4 right-4 z-50 toast-enter">
+                <div class="bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-2">
+                    <span class="inline-block">${icons.check}</span>
+                    <span>${state.toastMessage}</span>
+                </div>
+            </div>
+        ` : ''}
+
+        <header class="bg-white shadow-md sticky top-0 z-40">
+            <div class="max-w-6xl mx-auto px-4 py-4">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h1 class="text-3xl font-bold text-orange-600">🍡 JajanKu</h1>
+                        <p class="text-sm text-gray-600">${shop.name} - ${shop.tagline}</p>
+                    </div>
+                    <button onclick="toggleCart()" class="relative bg-orange-500 text-white p-3 rounded-full hover:bg-orange-600 transition-all transform hover:scale-110">
+                        <span class="inline-block">${icons.cart}</span>
+                        ${getTotalItems() > 0 ? `
+                            <span class="absolute -top-2 -right-2 bg-red-500 text-white text-xs w-6 h-6 flex items-center justify-center rounded-full font-bold">
+                                ${getTotalItems()}
+                            </span>
+                        ` : ''}
+                    </button>
+                </div>
+                <div class="mt-4 flex flex-wrap gap-4 text-sm text-gray-700">
+                    <div class="flex items-center gap-2">
+                        <span class="inline-block text-orange-500">${icons.clock}</span>
+                        <span>Buka: ${shop.openHours}</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="inline-block text-orange-500">${icons.map}</span>
+                        <span>${shop.address}</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="inline-block text-orange-500">${icons.phone}</span>
+                        <a href="https://wa.me/${CONFIG.SELLER_WHATSAPP}" class="text-orange-600 hover:underline">${shop.phone}</a>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <main class="max-w-6xl mx-auto px-4 py-8">
+            <div class="mb-6">
+                <h2 class="text-2xl font-bold text-gray-800 mb-2">Menu Kue Hari Ini</h2>
+                <p class="text-gray-600">Kue basah segar dibuat setiap pagi</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                ${state.products.map(p => `
+                    <div class="bg-white rounded-xl shadow-lg overflow-hidden product-card">
+                        <div class="bg-gradient-to-br from-orange-100 to-amber-100 p-8 flex items-center justify-center">
+                            <span class="text-7xl">${p.image}</span>
+                        </div>
+                        <div class="p-5">
+                            <h3 class="text-xl font-bold text-gray-800 mb-2">${p.name}</h3>
+                            <p class="text-sm text-gray-600 mb-3">${p.description}</p>
+                            <div class="flex justify-between items-center mb-4">
+                                <div>
+                                    <p class="text-2xl font-bold text-orange-600">${formatPrice(p.price)}</p>
+                                    <p class="text-xs text-gray-500">per ${p.unit}</p>
+                                </div>
+                                <div class="text-right">
+                                    <p class="text-sm text-gray-600">Stok: ${p.stock}</p>
+                                </div>
+                            </div>
+                            <button onclick="addToCart('${p.id}')" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-lg transition-all transform hover:scale-105 active:scale-95 flex items-center justify-center gap-2">
+                                <span class="inline-block">${icons.plus}</span>
+                                Pesan Sekarang
+                            </button>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        </main>
+
+        ${state.showCart ? renderCart() : ''}
+        ${state.showOrderForm ? renderOrderForm() : ''}
+
+        <footer class="bg-gray-800 text-white py-8 mt-12">
+            <div class="max-w-6xl mx-auto px-4 text-center">
+                <p class="text-lg font-bold mb-2">${shop.name} - ${shop.tagline}</p>
+                <p class="text-sm text-gray-400 mb-4">Melayani dengan sepenuh hati sejak ${shop.established}</p>
+                <div class="flex justify-center gap-4 text-sm">
+                    <a href="https://wa.me/${CONFIG.SELLER_WHATSAPP}" class="hover:text-orange-400 flex items-center gap-2">
+                        <span class="inline-block">${icons.phone}</span>
+                        WhatsApp
+                    </a>
+                </div>
+                <p class="text-xs text-gray-500 mt-6">© 2026 JajanKu Platform - Proyek PBL by Audysti Safrina Mendrofa</p>
+            </div>
+        </footer>
+    `;
+};
+
+const renderCart = () => {
+    const icons = CONFIG.ICONS;
+    return `
+        <div class="fixed inset-0 bg-black bg-opacity-50 z-50 modal-backdrop" onclick="toggleCart()">
+            <div class="fixed right-0 top-0 h-full w-full max-w-md bg-white shadow-2xl overflow-y-auto" onclick="event.stopPropagation()">
+                <div class="sticky top-0 bg-orange-500 text-white p-4 flex justify-between items-center">
+                    <h2 class="text-xl font-bold">Keranjang Belanja</h2>
+                    <button onclick="toggleCart()" class="hover:bg-orange-600 p-2 rounded-full">
+                        <span class="inline-block">${icons.x}</span>
+                    </button>
+                </div>
+                <div class="p-4">
+                    ${state.cart.length === 0 ? `
+                        <div class="text-center py-12">
+                            <p class="text-gray-500 text-lg">Keranjang masih kosong</p>
+                            <p class="text-sm text-gray-400 mt-2">Yuk pilih kue favorit kamu!</p>
+                        </div>
+                    ` : `
+                        ${state.cart.map(item => `
+                            <div class="bg-gray-50 rounded-lg p-4 mb-3">
+                                <div class="flex justify-between items-start mb-3">
+                                    <div class="flex-1">
+                                        <h3 class="font-bold text-gray-800">${item.name}</h3>
+                                        <p class="text-sm text-gray-600">${formatPrice(item.price)} / ${item.unit}</p>
+                                    </div>
+                                    <button onclick="removeFromCart('${item.id}')" class="text-red-500 hover:text-red-700 p-1">
+                                        <span class="inline-block" style="width: 20px; height: 20px;">${icons.x}</span>
+                                    </button>
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    <div class="flex items-center gap-3 bg-white rounded-lg p-1">
+                                        <button onclick="updateQuantity('${item.id}', -1)" class="bg-orange-500 text-white p-2 rounded hover:bg-orange-600">
+                                            <span class="inline-block">${icons.minus}</span>
+                                        </button>
+                                        <span class="font-bold px-3">${item.quantity}</span>
+                                        <button onclick="updateQuantity('${item.id}', 1)" class="bg-orange-500 text-white p-2 rounded hover:bg-orange-600">
+                                            <span class="inline-block">${icons.plus}</span>
+                                        </button>
+                                    </div>
+                                    <p class="font-bold text-orange-600">${formatPrice(item.price * item.quantity)}</p>
+                                </div>
+                            </div>
+                        `).join('')}
+                        <div class="border-t-2 border-gray-200 pt-4 mt-4">
+                            <div class="flex justify-between items-center mb-6">
+                                <span class="text-lg font-bold">Total</span>
+                                <span class="text-2xl font-bold text-orange-600">${formatPrice(getTotalPrice())}</span>
+                            </div>
+                            <button onclick="openOrderForm()" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-4 px-6 rounded-lg transition-all transform hover:scale-105">
+                                Lanjut ke Pemesanan
+                            </button>
+                        </div>
+                    `}
+                </div>
+            </div>
+        </div>
+    `;
+};
+
+const renderOrderForm = () => {
+    const icons = CONFIG.ICONS;
+    return `
+        <div class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 modal-backdrop" onclick="event.target === event.currentTarget && closeOrderForm()">
+            <div class="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+                <div class="sticky top-0 bg-orange-500 text-white p-4 flex justify-between items-center rounded-t-2xl">
+                    <h2 class="text-xl font-bold">📝 Form Pemesanan</h2>
+                    <button onclick="closeOrderForm()" class="hover:bg-orange-600 p-2 rounded-full">
+                        <span class="inline-block">${icons.x}</span>
+                    </button>
+                </div>
+                <div class="p-6">
+                    <div class="mb-4">
+                        <label class="block text-gray-700 font-bold mb-2">Nama Lengkap *</label>
+                        <input type="text" id="nama" class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-orange-500 focus:outline-none" placeholder="Masukkan nama lengkap">
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-gray-700 font-bold mb-2">No. Handphone *</label>
+                        <input type="tel" id="hp" class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-orange-500 focus:outline-none" placeholder="08123456789">
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-gray-700 font-bold mb-2">Alamat Lengkap *</label>
+                        <textarea id="alamat" class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-orange-500 focus:outline-none" rows="3" placeholder="Masukkan alamat lengkap untuk pengiriman"></textarea>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-gray-700 font-bold mb-2">Tanggal Ambil/Kirim *</label>
+                        <input type="date" id="tanggal" min="${new Date().toISOString().split('T')[0]}" class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-orange-500 focus:outline-none">
+                    </div>
+                    <div class="mb-6">
+                        <label class="block text-gray-700 font-bold mb-2">Catatan (Opsional)</label>
+                        <textarea id="catatan" class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-orange-500 focus:outline-none" rows="2" placeholder="Contoh: Jangan terlalu manis"></textarea>
+                    </div>
+                    <div class="bg-orange-50 p-4 rounded-lg mb-6 border-2 border-orange-200">
+                        <h3 class="font-bold mb-3 text-orange-800">🛒 Ringkasan Pesanan:</h3>
+                        ${state.cart.map(item => `
+                            <div class="flex justify-between text-sm mb-2">
+                                <span class="text-gray-700">${item.name} (x${item.quantity})</span>
+                                <span class="font-semibold text-gray-800">${formatPrice(item.price * item.quantity)}</span>
+                            </div>
+                        `).join('')}
+                        <div class="border-t-2 border-orange-300 mt-3 pt-3 flex justify-between">
+                            <span class="font-bold text-gray-800">Total</span>
+                            <span class="text-xl font-bold text-orange-600">${formatPrice(getTotalPrice())}</span>
+                        </div>
+                    </div>
+                    <button onclick="kirimKeWhatsApp()" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-4 px-6 rounded-lg transition-all transform hover:scale-105 active:scale-95 flex items-center justify-center gap-2 shadow-lg">
+                        <span class="inline-block">${icons.phone}</span>
+                        <span class="text-lg">Kirim Pesanan via WhatsApp</span>
+                    </button>
+                    <p class="text-xs text-gray-500 text-center mt-3">Anda akan diarahkan ke WhatsApp untuk menyelesaikan pesanan</p>
+                </div>
+            </div>
+        </div>
+    `;
+};
+
+// Global Functions
+window.toggleCart = () => {
+    state.showCart = !state.showCart;
+    render();
+};
+
+window.addToCart = (id) => {
+    addToCartById(id);
+};
+
+window.updateQuantity = (id, change) => {
+    updateQuantity(id, change);
+};
+
+window.removeFromCart = (id) => {
+    removeFromCart(id);
+};
+
+window.openOrderForm = () => {
+    state.showCart = false;
+    state.showOrderForm = true;
+    render();
+};
+
+window.closeOrderForm = () => {
+    state.showOrderForm = false;
+    render();
+};
+
+window.kirimKeWhatsApp = kirimKeWhatsApp;
+
+// Initialize when DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initApp);
+} else {
+    initApp();
+}
